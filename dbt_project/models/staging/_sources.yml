@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: raw_weather
+    database: greenandcoop_db
+    schema: raw
+    description: "Tables d'ingestion brute générées automatiquement par Airbyte"
+    tables:
+      - name: infoclimat_raw
+        description: "Données brutes des stations Synop et statiques InfoClimat"
+      - name: wu_lamadeleine_raw
+        description: "Relevés bruts de la station amateur de La Madeleine (ILAMAD25)"
+      - name: wu_ichtegem_raw
+        description: "Relevés bruts de la station amateur d'Ichtegem (IICHTE19)"

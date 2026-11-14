@@ -1,0 +1,80 @@
+version: 2
+
+models:
+  - name: dim_weather_stations
+    description: "Table dimensionnelle referencant l ensemble des stations meteo du reseau GreenAndCoop."
+    columns:
+      - name: station_id
+        description: "Identifiant unique de la station."
+        tests:
+          - unique
+          - not_null
+      - name: station_name
+        description: "Nom d usage de la station."
+        tests:
+          - not_null
+      - name: country
+        description: "Pays d implantation."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['France', 'Belgique']
+      - name: is_amateur
+        description: "Typologie de la station (Amateur ou Professionnelle)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+  - name: dim_date
+    description: "Table dimensionnelle temporelle enrichissant chaque jour calendaire."
+    columns:
+      - name: date_id
+        description: "Cle primaire numerique au format AAAAMMJJ."
+        tests:
+          - unique
+          - not_null
+      - name: full_date
+        description: "Date calendaire standard."
+        tests:
+          - unique
+          - not_null
+      - name: is_weekend
+        description: "Booleen signalant les samedis et dimanches."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+  - name: fct_weather_readings
+    description: "Table de faits centrale consolidant l ensemble des observations meteo harmonisees."
+    columns:
+      - name: reading_id
+        description: "Cle de substitution unique (Hash MD5)."
+        tests:
+          - unique
+          - not_null
+      - name: station_id
+        description: "Cle etrangere vers dim_weather_stations."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_weather_stations')
+              field: station_id
+      - name: date_id
+        description: "Cle etrangere vers dim_date."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_id
+      - name: recorded_at_utc
+        description: "Horodatage standardise en temps universel coordonne (UTC)."
+        tests:
+          - not_null
+      - name: data_source
+        description: "Origine de la donnee meteo."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['InfoClimat', 'Weather Underground']

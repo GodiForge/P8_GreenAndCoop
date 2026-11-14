@@ -1,0 +1,58 @@
+# ==============================================================
+# SÉCURITÉ ABSOLUE : EXCLUSION DES FICHIERS DE SECRETS (.ENV)
+# ==============================================================
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+ecs-dbt-task.json
+eventbridge-target.json
+
+# Exception autorisée : Le modèle public de documentation
+!.env.example
+
+# ==============================================================
+# DONNÉES LOCALES ET BASES DE DONNÉES
+# ==============================================================
+postgres_data/
+airbyte_data/db/
+airbyte_data/workspace/
+airbyte_data/local/*.json
+airbyte_data/local/*.xlsx
+
+# ==============================================================
+# COMPILATION DBT & ARTEFACTS
+# ==============================================================
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+
+# ==============================================================
+# CLÉS CLOUD & IDENTIFIANTS LOCAUX
+# ==============================================================
+*.pem
+*.key
+*.csv
+credentials.json
+aws_credentials
+
+# ==============================================================
+# POLLUTIONS OS & LOGS
+# ==============================================================
+.DS_Store
+Thumbs.db
+*.log
+*.ps1
+desktop.ini
+# Exclusions système et caches automatiques GodiForge
+AppData/
+.venv/
+__pycache__/
+*.pyc
+Desktop/
+Temp/
+Logs/
+node_modules/
+dist/
+build/

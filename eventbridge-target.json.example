@@ -1,0 +1,22 @@
+#eventbridge-target.json.example
+@'
+[
+  {
+    "Id": "dbt-daily-target",
+    "Arn": "arn:aws:ecs:eu-north-1:<VOTRE_AWS_ACCOUNT_ID>:cluster/greenandcoop-cluster",
+    "RoleArn": "arn:aws:iam::<VOTRE_AWS_ACCOUNT_ID>:role/ecsEventsRole",
+    "EcsParameters": {
+      "TaskDefinitionArn": "arn:aws:ecs:eu-north-1:<VOTRE_AWS_ACCOUNT_ID>:task-definition/greenandcoop-dbt-task",
+      "TaskCount": 1,
+      "LaunchType": "FARGATE",
+      "NetworkConfiguration": {
+        "awsvpcConfiguration": {
+          "Subnets": ["<VOTRE_SUBNET_ID>"],
+          "SecurityGroups": ["<VOTRE_SECURITY_GROUP_ID>"],
+          "AssignPublicIp": "ENABLED"
+        }
+      }
+    }
+  }
+]
+'@ | Set-Content -Path "eventbridge-target.json.example" -Encoding UTF8

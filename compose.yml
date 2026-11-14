@@ -1,0 +1,80 @@
+services:
+  # ==============================================================
+  # 1. POSTGRESQL 15 (ENTREPÔT LOCAL)
+  # ==============================================================
+  p8-postgres:
+    image: postgres:15
+    container_name: p8_postgres
+    restart: unless-stopped
+    ports:
+      - "${LOCAL_PG_PORT_EXTERNAL}:${LOCAL_PG_PORT_INTERNAL}"
+    environment:
+      - POSTGRES_USER=${LOCAL_PG_USER}
+      - POSTGRES_PASSWORD=${LOCAL_PG_PASSWORD}
+      - POSTGRES_DB=${LOCAL_PG_DB}
+      - TZ=Europe/Paris
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LOCAL_PG_USER} -d ${LOCAL_PG_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - p8_network
+
+  # ==============================================================
+  # 2. RUNTIME DBT CORE & AWS TOOLING
+  # ==============================================================
+  p8-dbt:
+    build:
+      context: ./dbt_env
+      dockerfile: Dockerfile
+    container_name: p8_dbt
+    restart: unless-stopped
+    working_dir: /usr/app/dbt
+    ports:
+      - "${DBT_DOCS_PORT}:8085"
+      - "${DBT_HTTP_FILES_PORT}:8089"
+    environment:
+      - TZ=Europe/Paris
+      - DBT_PROFILES_DIR=/usr/app/dbt
+      # Variables transmises à DBT (Local)
+      - PGHOST=${LOCAL_PG_HOST}
+      - PGUSER=${LOCAL_PG_USER}
+      - PGPASSWORD=${LOCAL_PG_PASSWORD}
+      - PGDATABASE=${LOCAL_PG_DB}
+      # Variables transmises à DBT (Cloud AWS RDS)
+      - AWS_RDS_ENDPOINT=${AWS_RDS_ENDPOINT}
+      - AWS_RDS_USER=${AWS_RDS_USER}
+      - AWS_RDS_PASSWORD=${AWS_RDS_PASSWORD}
+      - AWS_RDS_DB=${AWS_RDS_DB}
+    volumes:
+      - ./dbt_project:/usr/app/dbt
+      - ./airbyte_data/local:/local_files
+    command: >
+      sh -c "python3 -m http.server 8089 --directory /local_files &
+             tail -f /dev/null"
+    depends_on:
+      p8-postgres:
+        condition: service_healthy
+    networks:
+      - p8_network
+
+  # ==============================================================
+  # 3. SERVICE SFTP LOCAL DÉDIÉ (INGESTION AIRBYTE)
+  # ==============================================================
+  p8-sftp:
+    image: atmoz/sftp:alpine
+    container_name: p8_sftp
+    restart: unless-stopped
+    command: "${SFTP_USER}:${SFTP_PASSWORD}:${SFTP_UID}:${SFTP_GID}:upload"
+    volumes:
+      - ./airbyte_data/local:/home/${SFTP_USER}/upload:ro
+    networks:
+      - p8_network
+
+networks:
+  p8_network:
+    name: p8_network
+    driver: bridge

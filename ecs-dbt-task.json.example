@@ -1,0 +1,32 @@
+#ecs-dbt-task.json.example
+@'
+{
+  "family": "greenandcoop-dbt-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<VOTRE_AWS_ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "dbt-worker",
+      "image": "<VOTRE_AWS_ACCOUNT_ID>.dkr.ecr.eu-north-1.amazonaws.com/greenandcoop/dbt-prod:latest",
+      "essential": true,
+      "command": ["dbt", "run", "--target", "prod_rds"],
+      "environment": [
+        {"name": "AWS_RDS_ENDPOINT", "value": "<VOTRE_ENDPOINT_RDS>"},
+        {"name": "AWS_RDS_USER", "value": "<VOTRE_UTILISATEUR_RDS>"},
+        {"name": "AWS_RDS_PASSWORD", "value": "<VOTRE_MOT_DE_PASSE_RDS>"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/greenandcoop-dbt-prod",
+          "awslogs-region": "eu-north-1",
+          "awslogs-stream-prefix": "dbt"
+        }
+      }
+    }
+  ]
+}
+'@ | Set-Content -Path "ecs-dbt-task.json.example" -Encoding UTF8
