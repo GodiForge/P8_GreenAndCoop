@@ -131,13 +131,23 @@ Done. PASS=25 WARN=0 ERROR=0 SKIP=0 TOTAL=25
 
 ## 5. Sécurité & Confidentialité Git (Zéro-Leak)
 
-Pour protéger le projet lors de sa publication sur GitHub, une séparation stricte est appliquée entre le code et les mots de passe :
+Pour protéger le projet lors de sa publication sur GitHub et de son déploiement dans le Cloud, une séparation stricte est appliquée entre le code source et les identifiants sensibles :
 
 > [!IMPORTANT]
-> **Aucun secret n'est écrit en clair dans le code :**
+> **Aucun secret n'est écrit en clair dans le code ni dans l'image Docker :**
 > * **Fichier `.env` :** Stocke vos vrais identifiants en local. Il est bloqué par le `.gitignore` et ne part **jamais** sur GitHub.
 > * **Fichier `.env.example` :** Modèle public envoyé sur GitHub avec des valeurs d'exemple pour guider l'installation.
 > * **`compose.yml` & `profiles.yml` :** Utilisent uniquement des variables d'environnement (`${LOCAL_POSTGRES_USER}`, `{{ env_var('PGPASSWORD') }}`).
+
+### Comment les variables d'environnement sont gérées et protégées :
+
+1. **En environnement local (Docker Compose & dbt) :**
+   * Au démarrage (`docker compose up -d`), Docker Compose lit automatiquement le fichier `.env` local et injecte les variables (`LOCAL_PG_USER`, `LOCAL_PG_PASSWORD`, `AWS_RDS_ENDPOINT`, `AWS_RDS_PASSWORD`...) dans la mémoire des conteneurs.
+   * Dans `dbt_project/profiles.yml`, dbt récupère dynamiquement ces valeurs à l'exécution via la fonction Jinja `{{ env_var('...') }}` sans aucune valeur de repli sensible inscrite en dur.
+2. **En environnement Cloud AWS (Amazon ECR & ECS Fargate) :**
+   * **Image Docker neutre (`Dockerfile.prod`) :** L'image poussée sur Amazon ECR contient uniquement Python, dbt et le code SQL/YAML du projet — **aucun fichier `.env` ni mot de passe n'y est copié**.
+   * **Injection protégée au niveau de la tâche ECS :** Les accès à la base de production (`AWS_RDS_ENDPOINT`, `AWS_RDS_USER`, `AWS_RDS_PASSWORD`) sont renseignés uniquement dans la définition de tâche **ECS Fargate** (`ecs-dbt-task.json`). AWS les injecte en mémoire vive uniquement pendant les 3,5 secondes d'exécution du conteneur, puis détruit le conteneur dès la fin du traitement *(extensible via **AWS Secrets Manager** en production avancée)*.
+   * **Protection Git & Gabarits `.example` :** Les fichiers de configuration AWS réels (`ecs-dbt-task.json`, `eventbridge-target.json`) sont exclus du dépôt via `.gitignore`. Des gabarits anonymisés (`ecs-dbt-task.json.example` et `eventbridge-target.json.example`) sont fournis à la racine pour reproduire l'infrastructure.
 
 ---
 
@@ -185,7 +195,7 @@ AWS ne lit pas directement les fichiers présents sur votre ordinateur ni sur Gi
 ```powershell
 $REGION = "eu-north-1"
 $ACCOUNT_ID = "<VOTRE_ACCOUNT_ID>"
-$ECR_URI = "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/greenandcoop/dbt-prod"
+$ECR_URI = "$ACCOUNT_ID.dkr.ecr.$[REGION.amazonaws.com/greenandcoop/dbt-prod](https://REGION.amazonaws.com/greenandcoop/dbt-prod)"
 
 # 1. Connecter Docker au magasin privé Amazon ECR
 $PwdEcr = aws ecr get-login-password --region $REGION
@@ -254,7 +264,7 @@ docker exec -i p8_dbt dbt test --target prod_rds
 
 ### 1. Cloner le projet et préparer l'environnement
 ```bash
-git clone https://github.com/<votre-user>/P8_GreenAndCoop.git
+git clone [https://github.com/](https://github.com/)<votre-user>/P8_GreenAndCoop.git
 cd P8_GreenAndCoop
 
 # Créer votre fichier d'identifiants à partir du modèle
@@ -297,28 +307,30 @@ Ouvrez votre navigateur sur : **`http://localhost:8086`**
 
 ```text
 P8_GreenAndCoop/
-├── .env.example               # Modèle public des variables d'environnement
-├── .gitignore                 # Exclusion des mots de passe (.env) et données
-├── compose.yml                # Configuration Docker locale (Postgres, dbt, SFTP)
-├── Dockerfile.prod            # Image conteneur pour AWS ECR et ECS Fargate
-├── README.md                  # Documentation technique principale
+├── .env.example                    # Modèle public des variables d'environnement
+├── .gitignore                      # Exclusion des secrets (.env, JSON AWS) et données
+├── compose.yml                     # Configuration Docker locale (Postgres, dbt, SFTP)
+├── Dockerfile.prod                 # Image conteneur neutre pour AWS ECR et ECS Fargate
+├── ecs-dbt-task.json.example       # Gabarit public de la tâche ECS Fargate
+├── eventbridge-target.json.example # Gabarit public du déclencheur EventBridge
+├── README.md                       # Documentation technique principale
 │
 ├── airbyte_data/
-│   └── local/                 # Fichiers sources météo (JSON et Excel)
+│   └── local/                      # Fichiers sources météo (JSON et Excel)
 │
 ├── dbt_env/
-│   ├── Dockerfile             # Image d'exécution locale dbt
-│   └── requirements.txt       # Dépendances (dbt-core, dbt-postgres, awscli)
+│   ├── Dockerfile                  # Image d'exécution locale dbt
+│   └── requirements.txt            # Dépendances (dbt-core, dbt-postgres, awscli)
 │
-└── dbt_project/               # Projet analytique dbt
-    ├── dbt_project.yml        # Configuration des schémas et matérialisations
-    ├── profiles.yml           # Connexions sécurisées (local et prod_rds)
-    ├── macros/                # Macros Jinja (clean_numeric, generate_schema_name)
+└── dbt_project/                    # Projet analytique dbt
+    ├── dbt_project.yml             # Configuration des schémas et matérialisations
+    ├── profiles.yml                # Connexions sécurisées via env_var() (local et prod_rds)
+    ├── macros/                     # Macros Jinja (clean_numeric, generate_schema_name)
     ├── models/
-    │   ├── staging/           # Vues de nettoyage et conversion des unités
-    │   ├── intermediate/      # Vues d'union des stations et dédoublonnage
-    │   └── marts/             # Tables dimensionnelles et index B-Tree
-    └── tests/                 # Tests métier SQL (températures, pressions, dates)
+    │   ├── staging/                # Vues de nettoyage et conversion des unités
+    │   ├── intermediate/           # Vues d'union des stations et dédoublonnage
+    │   └── marts/                  # Tables dimensionnelles et index B-Tree
+    └── tests/                      # Tests métier SQL (températures, pressions, dates)
 ```
 
 ---
